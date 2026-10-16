@@ -1,6 +1,6 @@
 # Amplify Fusion - Websocket Voice Chat Demo Using Mistral AI
 
-An AI voice chatbot demo project created by Axway colleague, [Sebastien MORENO](https://github.com/SebM0), based on my [Fusion AI Chat Conversation Project](https://github.com/lbrenman/fusion-ai-chat-conversation-api) but with a major update to support a Fusion Websocket connection for streaming audio and using Mistral Text to Speech, Speech to Text and AI Chat Fusion connections.
+An AI voice chatbot demo project created by Axway colleague, [Sebastien MORENO](https://github.com/SebM0), based on the [Fusion AI Chat Conversation Project](https://github.com/lbrenman/fusion-ai-chat-conversation-api) with updates to support a Fusion Websocket connection for streaming audio and using Mistral Text to Speech, Speech to Text and AI Chat Fusion connections.
 
 The project was refactored to:
 * Add API Key authentication
