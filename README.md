@@ -13,6 +13,8 @@ Features include:
 * Send pre-recorded audio files for chat input
 * Record audio file and send for chat input
 * API Key security
+* Conversation Management
+* LLM Fallback
 
 ## Getting Started
 
@@ -29,6 +31,10 @@ Features include:
 * Use the app for a voice chat with the Mistral LLM
   
   ![image](images/voice-chat-app.png)
+
+* Watch the trace for debugging
+
+  ![image](images/trace.png)
 
 
 ## Web App - Fusion WSS Contract
