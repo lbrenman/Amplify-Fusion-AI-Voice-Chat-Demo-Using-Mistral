@@ -22,7 +22,7 @@ Features include:
 * Start the Websocket Server (`WS`) and the Webapp HTTP Server (`Web app`)
 * Create a consumer app in Manager and get an API Key
 * Copy the Web app URL and launch it (e.g. `https://axway-appc-se-design.sandbox.fusion.services.axway.com:9443/chatbot`)
-* Copy the Websocket server url, and add `/speech` to it and paste it into the web app settings along with your API Key and click connect (e.g. `wss://axway-appc-se-design.sandbox.fusion.services.axway.com:4443/ws/speech`)
+* Copy the Websocket server url (e.g. `wss://axway-appc-se-design.sandbox.fusion.services.axway.com:4443/ws`) and paste it into the web app settings along with your API Key and click connect. The web app will append `/speech`
   
   ![image](images/settings.png)
 
