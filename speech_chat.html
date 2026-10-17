@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ── Tokens ─────────────────────────────────────────────────────── */
+        :root {
+            --bg: #eef1f4;
+            --surface: #ffffff;
+            --surface-2: #f5f7f9;
+            --line: #dde2e8;
+            --ink: #18202b;
+            --ink-2: #566170;
+            --ink-3: #8a94a2;
+            --accent: #0b7a72;
+            --accent-ink: #ffffff;
+            --accent-soft: #e0f2ef;
+            --live: #e5484d;
+            --live-soft: #fde8e8;
+            --warn: #b7791f;
+            --ok: #2f9e5b;
+            --user-bubble: #0b7a72;
+            --user-ink: #ffffff;
+            --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px rgba(16, 24, 40, .06);
+            --radius-lg: 20px;
+            --radius: 12px;
+            --radius-sm: 8px;
+            color-scheme: light;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg: #0d1217;
+                --surface: #151b22;
+                --surface-2: #1b232c;
+                --line: #273240;
+                --ink: #e7ecf2;
+                --ink-2: #a3aebb;
+                --ink-3: #6f7b89;
+                --accent: #34c7b5;
+                --accent-ink: #062521;
+                --accent-soft: #12302d;
+                --live: #ff6369;
+                --live-soft: #3a1a1c;
+                --warn: #e5b45a;
+                --ok: #4cc38a;
+                --user-bubble: #1d5d57;
+                --user-ink: #eafaf7;
+                --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .35);
+                color-scheme: dark;
+            }
+        }
+
+        :root[data-theme="dark"] {
+            --bg: #0d1217;
+            --surface: #151b22;
+            --surface-2: #1b232c;
+            --line: #273240;
+            --ink: #e7ecf2;
+            --ink-2: #a3aebb;
+            --ink-3: #6f7b89;
+            --accent: #34c7b5;
+            --accent-ink: #062521;
+            --accent-soft: #12302d;
+            --live: #ff6369;
+            --live-soft: #3a1a1c;
+            --warn: #e5b45a;
+            --ok: #4cc38a;
+            --user-bubble: #1d5d57;
+            --user-ink: #eafaf7;
+            --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .35);
+            color-scheme: dark;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+            background: var(--bg);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+
+        button, input, select, textarea { font: inherit; color: inherit; }
+
+        [hidden] { display: none !important; }
+
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        svg.icon { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ── App shell ──────────────────────────────────────────────────── */
+        .app {
+            width: 100%;
+            max-width: 760px;
+            height: calc(100vh - 48px);
+            height: calc(100dvh - 48px);
+            min-height: 520px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px 14px 20px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand { flex: 1; min-width: 0; }
+
+        .brand h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+
+        .conn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12.5px;
+            color: var(--ink-2);
+            min-width: 0;
+        }
+
+        .conn #connText { white-space: nowrap; }
+        .conn .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+        .conn[data-state="connected"] .dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+        .conn[data-state="connecting"] .dot,
+        .conn[data-state="waiting"] .dot { background: var(--warn); animation: blink 1s infinite; }
+        .conn[data-state="error"] .dot { background: var(--live); }
+
+        @keyframes blink { 50% { opacity: .35; } }
+
+        .icon-btn {
+            width: 36px; height: 36px;
+            display: inline-grid; place-items: center;
+            border: none; background: transparent;
+            border-radius: var(--radius-sm);
+            color: var(--ink-2);
+            cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+        .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            height: 36px; padding: 0 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--line);
+            background: var(--surface);
+            font-size: 14px; font-weight: 600;
+            cursor: pointer;
+            transition: background .15s, border-color .15s, opacity .15s;
+            white-space: nowrap;
+        }
+        .btn:hover:not(:disabled) { background: var(--surface-2); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        .btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+
+        .btn.quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+        .btn.quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+
+        .btn.danger-hover.is-on:hover:not(:disabled) { background: var(--live-soft); border-color: var(--live); color: var(--live); }
+
+        /* ── Transcript ─────────────────────────────────────────────────── */
+        .transcript {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            scroll-behavior: smooth;
+        }
+
+        .empty {
+            margin: auto;
+            text-align: center;
+            max-width: 340px;
+            color: var(--ink-2);
+        }
+        .empty h2 { font-size: 18px; color: var(--ink); margin-bottom: 6px; font-weight: 600; }
+        .empty p { font-size: 14px; margin-bottom: 14px; }
+
+        .msg { display: flex; flex-direction: column; max-width: 82%; }
+        .msg.user { align-self: flex-end; align-items: flex-end; }
+        .msg.ai { align-self: flex-start; align-items: flex-start; }
+
+        .msg .who { font-size: 12px; color: var(--ink-3); margin: 0 4px 4px; }
+
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .msg.user .bubble { background: var(--user-bubble); color: var(--user-ink); border-bottom-right-radius: 5px; }
+        .msg.ai .bubble { background: var(--surface-2); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+
+        .bubble .text:empty { display: none; }
+
+        .clip { display: flex; flex-direction: column; gap: 6px; }
+        .bubble .text:not(:empty) + div:not(:empty) { margin-top: 10px; }
+
+        /* What you said, as transcribed by the server */
+        .bubble .said { font-size: 15px; }
+        .bubble .said:not(:empty) + .clip { padding-top: 10px; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+        .clip-meta { font-size: 12.5px; opacity: .85; display: flex; align-items: center; gap: 6px; }
+        .clip audio { width: 260px; max-width: 100%; height: 36px; }
+        .clip a { font-size: 12.5px; color: inherit; opacity: .8; }
+
+        .typing { display: flex; gap: 4px; padding: 4px 2px; }
+        .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: bounce 1.2s infinite; }
+        .typing span:nth-child(2) { animation-delay: .15s; }
+        .typing span:nth-child(3) { animation-delay: .3s; }
+        @keyframes bounce { 0%, 70%, 100% { transform: translateY(0); } 35% { transform: translateY(-5px); } }
+
+        /* ── View switch ────────────────────────────────────────────────── */
+        .views {
+            display: flex;
+            gap: 4px;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--line);
+        }
+        .view {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 10px 10px 9px;
+            border: none; background: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            font-size: 13.5px; font-weight: 600;
+            color: var(--ink-3);
+            cursor: pointer;
+        }
+        .view:hover { color: var(--ink); }
+        .view[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+        .badge {
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 99px;
+            background: var(--accent); color: var(--accent-ink);
+            font-size: 11px; font-weight: 700;
+            display: inline-grid; place-items: center;
+        }
+
+        /* ── Trace (history of exchanges) ───────────────────────────────── */
+        .trace { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .trace[hidden] { display: none; }
+        .trace-bar {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 12px 8px 20px;
+            border-bottom: 1px solid var(--line);
+            font-size: 13px; color: var(--ink-2);
+        }
+        .trace-count { flex: 1; }
+        .btn.sm { height: 30px; padding: 0 10px; font-size: 13px; }
+
+        .trace-list {
+            list-style: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .trace-empty { margin: auto; padding: 24px; max-width: 360px; text-align: center; font-size: 14px; color: var(--ink-2); }
+
+        /* One request and the responses it produced */
+        .ex {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface);
+            overflow: hidden;
+        }
+        .ex > summary {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 14px;
+            cursor: pointer;
+            list-style: none;
+        }
+        .ex > summary::-webkit-details-marker { display: none; }
+        .ex > summary:hover { background: var(--surface-2); }
+        .ex[open] > summary { border-bottom: 1px solid var(--line); background: var(--surface-2); }
+
+        .ex-num { font-size: 12px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+        .ex-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .ex-req { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ex-sub { font-size: 12.5px; color: var(--ink-3); }
+        .ex-stat { text-align: right; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .ex-stat strong { color: var(--accent); font-weight: 700; }
+        .ex-stat .waiting { color: var(--warn); }
+
+        .ex-body { padding: 4px 14px 14px; }
+        .ex-section { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 12px 0 6px; }
+
+        .frame { margin-bottom: 10px; }
+        .frame:last-child { margin-bottom: 0; }
+        .frame-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); margin-bottom: 5px; flex-wrap: wrap; }
+        .frame-head .dir { font-weight: 700; }
+        .frame.out .dir { color: var(--accent); }
+        .frame.in .dir { color: #6e56cf; }
+        :root[data-theme="dark"] .frame.in .dir { color: #a594f9; }
+        @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .frame.in .dir { color: #a594f9; } }
+        .frame-head .lat { color: var(--accent); font-weight: 600; }
+        .frame-head .copy { margin-left: auto; height: 26px; padding: 0 8px; font-size: 12px; }
+
+        .kind {
+            display: inline-block;
+            padding: 0 6px;
+            border-radius: 5px;
+            background: var(--surface-2); border: 1px solid var(--line);
+            font-size: 11.5px; color: var(--ink-2);
+        }
+
+        .frame pre {
+            font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+            font-size: 12px; line-height: 1.5;
+            white-space: pre-wrap; word-break: break-word;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            max-height: 300px; overflow: auto;
+        }
+
+        /* Connection events between exchanges */
+        .ev {
+            display: flex; align-items: baseline; gap: 8px;
+            padding: 0 4px;
+            font-size: 12.5px; color: var(--ink-3);
+        }
+        .ev .ev-time { font-variant-numeric: tabular-nums; }
+        .ev .ev-text { color: var(--ink-2); }
+        .ev .ev-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+        .ev.bad .ev-text { color: var(--live); font-weight: 600; }
+
+        @media (max-width: 560px) {
+            .ex > summary { grid-template-columns: auto 1fr; }
+            .ex-stat { grid-column: 2; text-align: left; }
+        }
+
+        /* ── Help ───────────────────────────────────────────────────────── */
+        .help-view { flex: 1; overflow-y: auto; }
+        .help-view[hidden] { display: none; }
+        .help-inner { max-width: 640px; padding: 24px 24px 32px; }
+        .help-title { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 8px; }
+        .help-inner .lede { font-size: 16px; color: var(--ink-2); line-height: 1.6; margin-bottom: 16px; }
+        .help-inner h3 { font-size: 15px; font-weight: 700; margin: 26px 0 8px; }
+        .help-inner p { font-size: 14.5px; color: var(--ink-2); line-height: 1.6; }
+        .help-inner code {
+            font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+            font-size: 12.5px;
+            padding: 1px 5px;
+            border-radius: 5px;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            color: var(--ink);
+            word-break: break-word;
+        }
+        .help-inner kbd {
+            font: inherit; font-size: 12px;
+            padding: 1px 6px;
+            border: 1px solid var(--line); border-bottom-width: 2px;
+            border-radius: 5px;
+            background: var(--surface-2);
+        }
+
+        .repo-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            color: var(--ink);
+            text-decoration: none;
+            transition: border-color .15s, background .15s;
+        }
+        .repo-link:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .repo-link svg.icon { width: 22px; height: 22px; }
+        .repo-link span { display: flex; flex-direction: column; font-size: 13px; color: var(--ink-2); min-width: 0; }
+        .repo-link strong { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+
+        .steps { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+        .steps li { font-size: 14.5px; color: var(--ink-2); line-height: 1.55; padding-left: 4px; }
+        .steps li::marker { color: var(--accent); font-weight: 700; }
+
+        .modes-help { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 14.5px; line-height: 1.5; }
+        .modes-help dt { font-weight: 600; }
+        .modes-help dd { color: var(--ink-2); }
+
+        .link-btn { border: none; background: none; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+        .contract { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
+        .contract th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 12.5px; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
+        .contract td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+        .contract td:first-child, .contract td:nth-child(2) { white-space: nowrap; color: var(--ink); }
+
+        @media (max-width: 560px) {
+            .help-inner { padding: 18px 16px 28px; }
+            .modes-help { grid-template-columns: 1fr; gap: 2px; }
+            .modes-help dd { margin-bottom: 8px; }
+        }
+
+        /* ── Notice ─────────────────────────────────────────────────────── */
+        .notice {
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 0 16px 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: var(--live-soft);
+            color: var(--live);
+            font-size: 13.5px;
+        }
+        .notice.show { display: flex; }
+        .notice p { flex: 1; color: var(--ink); }
+        .notice button { border: none; background: none; color: var(--ink-2); cursor: pointer; padding: 0 2px; }
+
+        /* ── Composer ───────────────────────────────────────────────────── */
+        .composer {
+            border-top: 1px solid var(--line);
+            padding: 12px 16px 16px;
+            background: var(--surface);
+        }
+
+        .modes {
+            display: inline-flex;
+            padding: 3px;
+            gap: 2px;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            margin-bottom: 14px;
+        }
+
+        .mode {
+            display: inline-flex; align-items: center; gap: 6px;
+            height: 30px; padding: 0 12px;
+            border: none; background: transparent;
+            border-radius: 7px;
+            font-size: 13.5px; font-weight: 500;
+            color: var(--ink-2);
+            cursor: pointer;
+        }
+        .mode svg.icon { width: 15px; height: 15px; }
+        .mode[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* Talk: the one bold element */
+        .talk {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0 2px;
+        }
+
+        .orb {
+            --level: 0;
+            position: relative;
+            width: 88px; height: 88px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            color: var(--accent-ink);
+            display: grid; place-items: center;
+            cursor: pointer;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none;
+            transition: background .15s, transform .12s;
+        }
+        .orb svg.icon { width: 32px; height: 32px; stroke-width: 1.9; }
+        .orb::before {
+            content: '';
+            position: absolute; inset: -8px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            opacity: .35;
+            transform: scale(calc(1 + var(--level) * .45));
+            transition: transform .07s linear, border-color .15s;
+        }
+        .orb:hover:not(:disabled) { transform: scale(1.03); }
+        .orb.listening { background: var(--live); transform: scale(.97); }
+        .orb.listening::before { border-color: var(--live); opacity: .55; }
+        .orb.busy { background: var(--ink-3); cursor: progress; }
+        .orb.busy::before { border-color: var(--ink-3); border-top-color: transparent; opacity: .8; animation: spin .9s linear infinite; }
+        .orb:disabled { opacity: .4; cursor: not-allowed; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .talk-hint { font-size: 13.5px; color: var(--ink-2); text-align: center; }
+        .talk-hint kbd {
+            font: inherit; font-size: 12px;
+            padding: 1px 6px;
+            border: 1px solid var(--line);
+            border-bottom-width: 2px;
+            border-radius: 5px;
+            background: var(--surface-2);
+        }
+
+        /* Type */
+        .type-row { display: flex; gap: 8px; align-items: flex-end; }
+        .type-row textarea {
+            flex: 1;
+            min-height: 44px; max-height: 140px;
+            padding: 11px 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface-2);
+            resize: none;
+            line-height: 1.4;
+        }
+        .type-row textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+        .send-btn { width: 44px; height: 44px; padding: 0; border-radius: var(--radius); }
+
+        /* File */
+        .drop {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 16px;
+            border: 1.5px dashed var(--line);
+            border-radius: var(--radius);
+            background: var(--surface-2);
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+        .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+        .drop .drop-text { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); }
+        .drop .drop-text strong { color: var(--ink); font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .drop input { display: none; }
+        .row-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+        /* Record */
+        .rec-row { display: flex; align-items: center; gap: 12px; }
+        .rec-btn.is-on { background: var(--live); border-color: var(--live); color: #fff; }
+        .rec-time { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ink-2); }
+        .rec-preview { display: none; margin-top: 12px; }
+        .rec-preview.show { display: block; }
+        .rec-preview audio { width: 100%; height: 40px; }
+
+        /* Level meter (settings mic test) */
+        .meter { height: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+        .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .07s linear; }
+
+        /* ── Settings dialog ────────────────────────────────────────────── */
+        dialog {
+            margin: auto;
+            width: min(480px, calc(100vw - 32px));
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            color: var(--ink);
+            box-shadow: var(--shadow);
+            padding: 0;
+        }
+        dialog::backdrop { background: rgba(8, 12, 18, .45); backdrop-filter: blur(2px); }
+
+        .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px 22px; }
+        .dlg-head h2 { font-size: 17px; font-weight: 700; }
+        .dlg-body { padding: 4px 22px 8px; max-height: 70vh; overflow-y: auto; }
+        .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px 18px; border-top: 1px solid var(--line); margin-top: 8px; }
+
+        fieldset { border: none; padding: 14px 0; border-bottom: 1px solid var(--line); }
+        fieldset:last-of-type { border-bottom: none; }
+        legend { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .field:last-child { margin-bottom: 0; }
+        .field label { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+        .field .help { font-size: 12.5px; color: var(--ink-3); }
+
+        .input, .select {
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            background: var(--surface-2);
+            width: 100%;
+            font-size: 14px;
+        }
+        .input:focus, .select:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+        .input.mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
+
+        .with-btn { display: flex; gap: 6px; }
+        .with-btn .input { flex: 1; }
+
+        .seg { display: flex; gap: 6px; }
+        .seg label {
+            flex: 1;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            height: 38px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            font-size: 13.5px; color: var(--ink-2);
+            cursor: pointer;
+        }
+        .seg input { position: absolute; opacity: 0; pointer-events: none; }
+        .seg input:checked + span { color: var(--ink); font-weight: 600; }
+        .seg label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+        .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        .mic-test { display: flex; align-items: center; gap: 10px; }
+        .mic-test .meter { flex: 1; }
+        .mic-status { font-size: 12.5px; color: var(--ink-2); min-height: 18px; margin-top: 6px; }
+
+        /* ── Small screens ──────────────────────────────────────────────── */
+        @media (max-width: 560px) {
+            body { padding: 0; }
+            .app { height: 100vh; height: 100dvh; border-radius: 0; border: none; }
+            .topbar { padding: 10px 8px 10px 16px; gap: 4px; }
+            .btn-label { display: none; }
+            .msg { max-width: 92%; }
+            .mode .mode-label { display: none; }
+            .conn .host { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before { animation: none !important; transition: none !important; }
+            .transcript { scroll-behavior: auto; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Icon sprite -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+        <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M10 16v-4l4 2z"/></symbol>
+        <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></symbol>
+        <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></symbol>
+        <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+        <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></symbol>
+        <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></symbol>
+        <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+    </svg>
+
+    <main class="app">
+        <header class="topbar">
+            <div class="brand">
+                <h1>Voice Console</h1>
+                <div class="conn" id="conn" data-state="idle">
+                    <span class="dot"></span>
+                    <span id="connText">Not connected</span>
+                    <span class="host" id="connHost"></span>
+                </div>
+            </div>
+            <button class="icon-btn" id="newConvBtn" title="New conversation" aria-label="New conversation">
+                <svg class="icon"><use href="#i-plus"/></svg>
+            </button>
+            <button class="icon-btn" id="themeBtn" title="Toggle light/dark" aria-label="Toggle light or dark mode">
+                <svg class="icon"><use href="#i-moon" id="themeIcon"/></svg>
+            </button>
+            <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+                <svg class="icon"><use href="#i-gear"/></svg>
+            </button>
+            <button class="btn primary danger-hover" id="connectBtn">
+                <svg class="icon"><use href="#i-plug"/></svg><span class="btn-label" id="connectLabel">Connect</span>
+            </button>
+        </header>
+
+        <nav class="views" role="tablist" aria-label="View">
+            <button class="view" role="tab" data-view="chat" aria-selected="true">Chat</button>
+            <button class="view" role="tab" data-view="trace" aria-selected="false">Trace <span class="badge" id="traceBadge" hidden>0</span></button>
+            <button class="view" role="tab" data-view="help" aria-selected="false">Help</button>
+        </nav>
+
+        <!-- Trace: history of request/response exchanges -->
+        <section class="trace" id="trace" hidden>
+            <div class="trace-bar">
+                <span class="trace-count" id="traceCount">No exchanges yet</span>
+                <button class="btn quiet sm" id="traceCopy">Copy as JSON</button>
+                <button class="btn quiet sm" id="traceClear">Clear</button>
+            </div>
+            <ol class="trace-list" id="traceList"></ol>
+            <div class="trace-empty" id="traceEmpty">Send a message to see each request and the responses the server returned for it.</div>
+        </section>
+
+        <!-- Help -->
+        <section class="help-view" id="help" hidden>
+            <div class="help-inner">
+                <h2 class="help-title">About Voice Console</h2>
+                <p class="lede">Voice Console is the browser client for the AI voice chat demo built on <strong>Axway Amplify Fusion</strong>. You talk or type to an AI assistant, and every message travels over a single WebSocket connection to a Fusion integration that handles transcription, the AI conversation and the spoken reply.</p>
+                <a class="repo-link" href="https://github.com/lbrenman/Amplify-Fusion-AI-Voice-Chat-Demo-Using-Mistral" target="_blank" rel="noopener">
+                    <svg class="icon"><use href="#i-github"/></svg>
+                    <span><strong>Amplify-Fusion-AI-Voice-Chat-Demo-Using-Mistral</strong>Project source, Fusion export and setup guide on GitHub</span>
+                </a>
+
+                <h3>How a voice turn works</h3>
+                <ol class="steps">
+                    <li>You hold the talk button and speak. The browser records your voice and sends it to Fusion as a 16 kHz WAV file.</li>
+                    <li>Fusion transcribes the audio with Mistral speech-to-text and sends back what it heard, which appears in your message bubble.</li>
+                    <li>Fusion passes the text to the AI chat model (Mistral, with Gemini as a fallback) and keeps the conversation history in Postgres, so the assistant remembers earlier turns.</li>
+                    <li>The reply comes back as text and as speech from Mistral text-to-speech, which plays automatically.</li>
+                </ol>
+
+                <h3>Getting started</h3>
+                <ol class="steps">
+                    <li>Open <button class="link-btn" type="button" data-open-settings>Settings</button> and enter the WebSocket base URL, for example <code>wss://host:4443/ws</code>. The app adds <code>/speech</code> for you.</li>
+                    <li>Add the API key from your consumer app in Amplify Fusion Manager.</li>
+                    <li>Click <strong>Connect</strong>, then hold the talk button or the <kbd>Space</kbd> bar and speak.</li>
+                </ol>
+
+                <h3>Ways to send a message</h3>
+                <dl class="modes-help">
+                    <dt>Talk</dt><dd>Push to talk. Hold to record, release to send. Pressing it while a reply is playing interrupts the reply.</dd>
+                    <dt>Type</dt><dd>Send a text message. Press Enter to send and Shift+Enter for a new line.</dd>
+                    <dt>Audio file</dt><dd>Send a recording you already have, such as a WAV or MP3. Drag it in or choose a file.</dd>
+                    <dt>Record</dt><dd>Record, listen back, then decide whether to send or discard it.</dd>
+                </dl>
+
+                <h3>Trace</h3>
+                <p>The Trace tab keeps a history of every exchange on the connection: what you sent and each response the server returned, with sizes and timings. Audio is summarized rather than shown in full. Use <strong>Copy as JSON</strong> to share a session when debugging.</p>
+
+                <h3>Message format</h3>
+                <p>The app connects to <code>&lt;base&gt;/speech?conversationId=&lt;id&gt;&amp;x-api-key=&lt;key&gt;</code>. The key goes in the address because browsers can't add headers to a WebSocket.</p>
+                <table class="contract">
+                    <thead><tr><th>Direction</th><th>Frame</th><th>Content</th></tr></thead>
+                    <tbody>
+                        <tr><td>Sent</td><td>Text</td><td><code>{"type":"CHAT","message":"…"}</code></td></tr>
+                        <tr><td>Sent</td><td>Binary</td><td>Voice as 16 kHz mono WAV, or an audio file as-is</td></tr>
+                        <tr><td>Received</td><td>Text</td><td>One event or an array of events: <code>RESPONSE</code>, <code>TRANSCRIBED_REQUEST</code> or <code>ERROR</code>, each with a <code>message</code>. Plain text is shown as the reply.</td></tr>
+                        <tr><td>Received</td><td>Binary</td><td>Spoken reply audio, played automatically after voice messages</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Troubleshooting</h3>
+                <dl class="modes-help">
+                    <dt>Won't connect</dt><dd>A close code of 1006 usually means the server rejected the connection. Check the base URL and API key in Settings, and that the Fusion WebSocket server is running.</dd>
+                    <dt>Microphone blocked</dt><dd>Allow the microphone from the icon at the left of Chrome's address bar, and turn on Google Chrome in macOS System Settings → Privacy &amp; Security → Microphone.</dd>
+                    <dt>No sound detected</dt><dd>Pick a different input device in Settings and use Test to check the level.</dd>
+                    <dt>Reply doesn't play</dt><dd>If the browser blocks auto-play, press play on the reply once and it will be allowed for the rest of the session.</dd>
+                </dl>
+            </div>
+        </section>
+
+        <section class="transcript" id="transcript" aria-live="polite">
+            <div class="empty" id="emptyState">
+                <h2 id="emptyTitle">Start a conversation</h2>
+                <p id="emptyText">Connect to the server, then hold the talk button and speak.</p>
+                <button class="btn" id="emptySettingsBtn" hidden>
+                    <svg class="icon"><use href="#i-gear"/></svg>Open settings
+                </button>
+            </div>
+        </section>
+
+        <div class="notice" id="notice" role="alert">
+            <svg class="icon"><use href="#i-alert"/></svg>
+            <p id="noticeText"></p>
+            <button id="noticeClose" aria-label="Dismiss"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>
+
+        <footer class="composer">
+            <div class="modes" role="tablist">
+                <button class="mode" role="tab" data-mode="talk" aria-selected="true"><svg class="icon"><use href="#i-mic"/></svg><span class="mode-label">Talk</span></button>
+                <button class="mode" role="tab" data-mode="type" aria-selected="false"><svg class="icon"><use href="#i-keyboard"/></svg><span class="mode-label">Type</span></button>
+                <button class="mode" role="tab" data-mode="file" aria-selected="false"><svg class="icon"><use href="#i-file"/></svg><span class="mode-label">Audio file</span></button>
+                <button class="mode" role="tab" data-mode="record" aria-selected="false"><svg class="icon"><use href="#i-record"/></svg><span class="mode-label">Record</span></button>
+            </div>
+
+            <!-- Talk (push to talk) -->
+            <div class="panel active" id="panel-talk">
+                <div class="talk">
+                    <button class="orb" id="orb" type="button" aria-label="Hold to talk">
+                        <svg class="icon"><use href="#i-mic"/></svg>
+                    </button>
+                    <div class="talk-hint" id="talkHint">Hold to talk, or hold <kbd>Space</kbd>. Release to send.</div>
+                </div>
+            </div>
+
+            <!-- Type -->
+            <div class="panel" id="panel-type">
+                <div class="type-row">
+                    <textarea id="msgInput" rows="1" placeholder="Type a message"></textarea>
+                    <button class="btn primary send-btn" id="sendBtn" aria-label="Send message" disabled>
+                        <svg class="icon"><use href="#i-send"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Audio file -->
+            <div class="panel" id="panel-file">
+                <label class="drop" id="drop">
+                    <svg class="icon"><use href="#i-file"/></svg>
+                    <span class="drop-text" id="dropText"><strong>Choose an audio file</strong>or drop one here — WAV, MP3, M4A, OGG, FLAC, WebM</span>
+                    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm">
+                </label>
+                <div class="row-end">
+                    <button class="btn quiet" id="clearFileBtn" hidden>Clear</button>
+                    <button class="btn primary" id="sendFileBtn" disabled>
+                        <svg class="icon"><use href="#i-send"/></svg>Send file
+                    </button>
+                </div>
+            </div>
+
+            <!-- Record -->
+            <div class="panel" id="panel-record">
+                <div class="rec-row">
+                    <button class="btn rec-btn" id="recBtn">
+                        <svg class="icon"><use href="#i-record" id="recIcon"/></svg><span id="recLabel">Start recording</span>
+                    </button>
+                    <span class="rec-time" id="recTime"></span>
+                </div>
+                <div class="rec-preview" id="recPreview">
+                    <audio id="recPlayer" controls></audio>
+                    <div class="row-end">
+                        <button class="btn quiet" id="discardBtn"><svg class="icon"><use href="#i-trash"/></svg>Discard</button>
+                        <button class="btn primary" id="sendRecBtn" disabled><svg class="icon"><use href="#i-send"/></svg>Send recording</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Settings -->
+    <dialog id="settings" aria-labelledby="settingsTitle">
+        <form method="dialog" id="settingsForm">
+            <div class="dlg-head">
+                <h2 id="settingsTitle">Settings</h2>
+                <button class="icon-btn" value="cancel" formnovalidate aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="dlg-body">
+                <fieldset>
+                    <legend>Connection</legend>
+                    <div class="field">
+                        <label for="setUrl">WebSocket base URL</label>
+                        <input class="input mono" id="setUrl" type="text" placeholder="wss://host:port/ws" spellcheck="false" autocomplete="off">
+                        <span class="help" id="urlPreview"></span>
+                    </div>
+                    <div class="field">
+                        <label for="setKey">API key</label>
+                        <div class="with-btn">
+                            <input class="input mono" id="setKey" type="password" placeholder="Optional" spellcheck="false" autocomplete="off">
+                            <button class="icon-btn" type="button" id="toggleKey" aria-label="Show API key" title="Show or hide"><svg class="icon"><use href="#i-eye"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="setKeyParam">Send key as query parameter</label>
+                        <input class="input mono" id="setKeyParam" type="text" placeholder="x-api-key" spellcheck="false" autocomplete="off">
+                        <span class="help">Browsers can't add headers to a WebSocket, so the key is added to the URL, e.g. <code>?x-api-key=…</code></span>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Microphone</legend>
+                    <div class="field">
+                        <label for="setMic">Input device</label>
+                        <select class="select" id="setMic"><option value="">System default</option></select>
+                    </div>
+                    <div class="mic-test">
+                        <button class="btn" type="button" id="micTestBtn">Test</button>
+                        <div class="meter"><i id="testMeter"></i></div>
+                    </div>
+                    <div class="mic-status" id="micStatus"></div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Appearance</legend>
+                    <div class="seg" role="radiogroup">
+                        <label><input type="radio" name="theme" value="system"><span>System</span></label>
+                        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+                        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+                    </div>
+                </fieldset>
+            </div>
+            <div class="dlg-foot">
+                <button class="btn quiet" value="cancel" formnovalidate>Cancel</button>
+                <button class="btn primary" value="save" id="saveSettingsBtn">Save</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+    (() => {
+        'use strict';
+
+        // ── Constants & state ────────────────────────────────────────────────
+        const MAX_UPLOAD_SIZE = 100 * 1000 * 1000;
+        const PTT_MIN_MS = 400;
+        const STORE_KEY = 'voiceConsole.settings';
+        const DEFAULTS = {
+            url: 'wss://axway-appc-se-design.sandbox.fusion.services.axway.com:4443/ws',
+            apiKey: '',
+            keyParam: 'x-api-key',
+            micId: '',
+            theme: 'system',
+        };
+
+        const $ = (id) => document.getElementById(id);
+
+        let settings = loadSettings();
+        let ws = null;
+        let conversationId = crypto.randomUUID();
+        let lastInputWasAudio = false;
+        let pendingAiTurn = null;
+        let typingEl = null;
+        let currentReplyAudio = null;
+
+        // ── Settings persistence ─────────────────────────────────────────────
+        function loadSettings() {
+            let saved = {};
+            try {
+                saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+                // migrate the URL saved by the previous version of this page
+                if (!saved.url) {
+                    const old = localStorage.getItem('speechChat.wsUrl');
+                    if (old) saved.url = old;
+                }
+                if (!saved.micId) {
+                    const oldMic = localStorage.getItem('speechChat.micId');
+                    if (oldMic) saved.micId = oldMic;
+                }
+            } catch (e) { /* storage blocked */ }
+            return { ...DEFAULTS, ...saved };
+        }
+
+        function persistSettings() {
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) { /* storage blocked */ }
+        }
+
+        // ── Theme ────────────────────────────────────────────────────────────
+        const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+
+        function isDark() {
+            return settings.theme === 'dark' || (settings.theme === 'system' && darkQuery.matches);
+        }
+
+        function applyTheme() {
+            if (settings.theme === 'system') document.documentElement.removeAttribute('data-theme');
+            else document.documentElement.setAttribute('data-theme', settings.theme);
+            $('themeIcon').setAttribute('href', isDark() ? '#i-sun' : '#i-moon');
+        }
+
+        $('themeBtn').addEventListener('click', () => {
+            settings.theme = isDark() ? 'light' : 'dark';
+            persistSettings();
+            applyTheme();
+        });
+        darkQuery.addEventListener('change', applyTheme);
+
+        // ── Notices ──────────────────────────────────────────────────────────
+        function showError(msg) {
+            $('noticeText').textContent = msg;
+            $('notice').classList.add('show');
+        }
+        function hideError() { $('notice').classList.remove('show'); }
+        $('noticeClose').addEventListener('click', hideError);
+
+        // ── Trace: history of request/response exchanges ─────────────────────
+        // Each message you send starts an exchange; every frame the server sends
+        // afterwards is listed under it until you send the next one.
+        const TRACE_MAX = 200;
+        const timeline = [];          // exchanges and connection events, oldest first
+        let exchangeSeq = 0;
+        let currentEx = null;
+        let unseenTrace = 0;
+
+        function activeView() { return document.querySelector('.view[aria-selected="true"]').dataset.view; }
+
+        document.querySelectorAll('.view').forEach(v => v.addEventListener('click', () => {
+            document.querySelectorAll('.view').forEach(x => x.setAttribute('aria-selected', String(x === v)));
+            const view = v.dataset.view;
+            $('transcript').hidden = view !== 'chat';
+            $('trace').hidden = view !== 'trace';
+            $('help').hidden = view !== 'help';
+            // Help is for reading; give it the full height
+            document.querySelector('.composer').hidden = view === 'help';
+            if (view === 'help') { pttRelease(); $('help').scrollTop = 0; }
+            if (view === 'trace') { unseenTrace = 0; $('traceBadge').hidden = true; $('traceList').scrollTop = 0; }
+        }));
+
+        function maskKey(url) {
+            const k = settings.apiKey;
+            if (!k) return url;
+            const masked = k.length > 6 ? k.slice(0, 4) + '…' + k.slice(-2) : '••••';
+            return url.split(encodeURIComponent(k)).join(masked).split(k).join(masked);
+        }
+
+        const clock = (t) => {
+            const d = new Date(t);
+            return d.toLocaleTimeString([], { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+        };
+        const fmtBytes = (n) => n < 1000 ? n + ' B' : n < 1e6 ? (n / 1000).toFixed(1) + ' KB' : (n / 1e6).toFixed(2) + ' MB';
+        const fmtMs = (ms) => ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(2) + ' s';
+
+        // Timing is captured immediately; entries are processed one at a time so they
+        // keep arrival order even when a binary frame needs an async read.
+        let traceQueue = Promise.resolve();
+        function trace(dir, data, opts = {}) {
+            const t = Date.now();
+            traceQueue = traceQueue.then(() => addTrace(dir, data, opts, t)).catch(err => console.error('trace', err));
+        }
+
+        async function describeFrame(dir, data, t) {
+            const f = { dir, t };
+            if (data instanceof Blob) {
+                f.kind = 'binary';
+                f.bytes = data.size;
+                f.mime = await detectAudioMimeType(data);
+                // A short Base64 preview only — never the whole audio payload
+                const head = new Uint8Array(await data.slice(0, 12).arrayBuffer());
+                f.preview = btoa(String.fromCharCode(...head)) + '…';
+            } else {
+                f.kind = 'text';
+                f.text = String(data);
+                f.bytes = new TextEncoder().encode(f.text).length;
+                try {
+                    const parsed = JSON.parse(f.text);
+                    if (parsed !== null && typeof parsed === 'object') {
+                        f.json = parsed;
+                        f.kind = Array.isArray(parsed) ? 'json array' : 'json';
+                    }
+                } catch (err) { /* plain text */ }
+            }
+            return f;
+        }
+
+        async function addTrace(dir, data, opts, t) {
+            if (dir === 'sys') {
+                const ev = { type: 'event', t, text: data, detail: opts.detail || '', bad: !!opts.bad };
+                pushTimeline(ev);
+                renderEvent(ev);
+                return;
+            }
+            const frame = await describeFrame(dir, data, t);
+            if (dir === 'out') {
+                currentEx = { type: 'exchange', id: ++exchangeSeq, t, request: frame, responses: [] };
+                pushTimeline(currentEx);
+                renderExchange(currentEx, true);
+                if (activeView() !== 'trace') {
+                    unseenTrace++;
+                    $('traceBadge').textContent = unseenTrace > 99 ? '99+' : unseenTrace;
+                    $('traceBadge').hidden = false;
+                }
+            } else {
+                if (!currentEx) {   // server spoke first (e.g. a welcome message)
+                    currentEx = { type: 'exchange', id: ++exchangeSeq, t, request: null, responses: [] };
+                    pushTimeline(currentEx);
+                }
+                frame.latency = t - currentEx.t;
+                currentEx.responses.push(frame);
+                renderExchange(currentEx, false);
+            }
+            updateTraceCount();
+        }
+
+        function pushTimeline(item) {
+            timeline.push(item);
+            while (timeline.length > TRACE_MAX) {
+                const old = timeline.shift();
+                old.el?.remove();
+            }
+        }
+
+        function updateTraceCount() {
+            const n = timeline.filter(i => i.type === 'exchange').length;
+            $('traceCount').textContent = n ? n + (n === 1 ? ' exchange' : ' exchanges') : 'No exchanges yet';
+            $('traceEmpty').hidden = timeline.length > 0;
+        }
+
+        function prependToList(el) {
+            const list = $('traceList');
+            list.insertBefore(el, list.firstChild);
+            $('traceEmpty').hidden = true;
+        }
+
+        function renderEvent(ev) {
+            const li = document.createElement('li');
+            li.className = 'ev' + (ev.bad ? ' bad' : '');
+            const time = document.createElement('span');
+            time.className = 'ev-time';
+            time.textContent = clock(ev.t);
+            const text = document.createElement('span');
+            text.className = 'ev-text';
+            text.textContent = ev.text;
+            const detail = document.createElement('span');
+            detail.className = 'ev-detail';
+            detail.textContent = ev.detail.replace(/\n/g, ' · ');
+            detail.title = ev.detail;
+            li.append(time, text, detail);
+            ev.el = li;
+            prependToList(li);
+        }
+
+        function requestLabel(f) {
+            if (!f) return 'Server-initiated';
+            if (f.kind === 'binary') return 'Voice · ' + f.mime + ' · ' + fmtBytes(f.bytes);
+            if (f.json && typeof f.json.message === 'string') return f.json.message;
+            return f.text;
+        }
+
+        function renderExchange(ex, isNew) {
+            let det = ex.el?.querySelector('details');
+            if (!det) {
+                const li = document.createElement('li');
+                det = document.createElement('details');
+                det.className = 'ex';
+                det.open = true;
+                li.appendChild(det);
+                ex.el = li;
+                // collapse the previous exchange so the newest one stands out
+                const prevOpen = $('traceList').querySelector('details.ex[open]');
+                if (prevOpen && isNew) prevOpen.open = false;
+                prependToList(li);
+            }
+
+            // Summary row
+            const sum = document.createElement('summary');
+            const num = document.createElement('span');
+            num.className = 'ex-num';
+            num.textContent = '#' + ex.id;
+            const main = document.createElement('span');
+            main.className = 'ex-main';
+            const req = document.createElement('span');
+            req.className = 'ex-req';
+            req.textContent = requestLabel(ex.request);
+            const sub = document.createElement('span');
+            sub.className = 'ex-sub';
+            sub.textContent = clock(ex.t) + (ex.request ? ' · ' + ex.request.kind + ' request' : '');
+            main.append(req, sub);
+            const stat = document.createElement('span');
+            stat.className = 'ex-stat';
+            const n = ex.responses.length;
+            if (!n) {
+                stat.innerHTML = '<span class="waiting">Waiting for response</span>';
+            } else {
+                const first = ex.responses[0].latency, last = ex.responses[n - 1].latency;
+                stat.innerHTML = n + (n === 1 ? ' response' : ' responses') + ' · <strong>' + fmtMs(first) + '</strong>' +
+                    (n > 1 ? ' → ' + fmtMs(last) : '');
+            }
+            sum.append(num, main, stat);
+
+            // Body
+            const body = document.createElement('div');
+            body.className = 'ex-body';
+            if (ex.request) {
+                body.appendChild(sectionTitle('Request'));
+                body.appendChild(frameView(ex.request));
+            }
+            body.appendChild(sectionTitle(n ? 'Responses (' + n + ')' : 'Responses'));
+            if (!n) {
+                const p = document.createElement('div');
+                p.className = 'ex-sub';
+                p.textContent = 'Nothing received yet.';
+                body.appendChild(p);
+            }
+            ex.responses.forEach((f, i) => body.appendChild(frameView(f, i + 1)));
+
+            det.replaceChildren(sum, body);
+        }
+
+        function sectionTitle(text) {
+            const h = document.createElement('div');
+            h.className = 'ex-section';
+            h.textContent = text;
+            return h;
+        }
+
+        function frameView(f, index) {
+            const wrap = document.createElement('div');
+            wrap.className = 'frame ' + f.dir;
+            const head = document.createElement('div');
+            head.className = 'frame-head';
+
+            const dir = document.createElement('span');
+            dir.className = 'dir';
+            dir.textContent = f.dir === 'out' ? '↑ Sent' : '↓ #' + index;
+            const kind = document.createElement('span');
+            kind.className = 'kind';
+            kind.textContent = f.kind;
+            const size = document.createElement('span');
+            size.textContent = fmtBytes(f.bytes);
+            head.append(dir, kind, size);
+            if (f.latency !== undefined) {
+                const lat = document.createElement('span');
+                lat.className = 'lat';
+                lat.title = 'Time after the request was sent';
+                lat.textContent = '+' + fmtMs(f.latency);
+                head.appendChild(lat);
+            }
+
+            const pre = document.createElement('pre');
+            if (f.kind === 'binary') {
+                pre.textContent = f.mime + ' · ' + f.bytes.toLocaleString() + ' bytes\n' + f.preview;
+            } else {
+                pre.textContent = f.json ? JSON.stringify(f.json, null, 2) : f.text;
+                const copy = document.createElement('button');
+                copy.className = 'btn quiet copy';
+                copy.type = 'button';
+                copy.textContent = 'Copy';
+                copy.addEventListener('click', (e) => { e.preventDefault(); copyText(f.text, copy); });
+                head.appendChild(copy);
+            }
+            wrap.append(head, pre);
+            return wrap;
+        }
+
+        async function copyText(text, btn) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (err) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            }
+            const label = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(() => { btn.textContent = label; }, 1200);
+        }
+
+        function frameJson(f) {
+            const o = { direction: f.dir === 'out' ? 'sent' : 'received', time: new Date(f.t).toISOString(), kind: f.kind, bytes: f.bytes };
+            if (f.latency !== undefined) o.msAfterRequest = f.latency;
+            if (f.kind === 'binary') { o.format = f.mime; o.preview = f.preview; }
+            else o.payload = f.json ?? f.text;
+            return o;
+        }
+
+        $('traceCopy').addEventListener('click', () => {
+            const out = timeline.map(i => i.type === 'event'
+                ? { event: i.text, time: new Date(i.t).toISOString(), detail: i.detail || undefined }
+                : { exchange: i.id, request: i.request ? frameJson(i.request) : null, responses: i.responses.map(frameJson) });
+            copyText(JSON.stringify(out, null, 2), $('traceCopy'));
+        });
+
+        $('traceClear').addEventListener('click', () => {
+            timeline.length = 0;
+            currentEx = null;
+            $('traceList').innerHTML = '';
+            unseenTrace = 0;
+            $('traceBadge').hidden = true;
+            updateTraceCount();
+        });
+
+        // ── Connection ───────────────────────────────────────────────────────
+        function isOpen() { return ws && ws.readyState === WebSocket.OPEN; }
+
+        function hostOf(url) {
+            try { return new URL(url).host; } catch (e) { return ''; }
+        }
+
+        // The user enters only the base (e.g. wss://host:4443/ws); the app adds /speech.
+        // A base that already ends in /speech is accepted as-is, so it never doubles up.
+        const ENDPOINT_PATH = '/speech';
+
+        function endpointUrl(base) {
+            const u = new URL(base.trim());
+            const path = u.pathname.replace(/\/+$/, '');
+            u.pathname = path.endsWith(ENDPOINT_PATH) ? path : path + ENDPOINT_PATH;
+            return u;
+        }
+
+        function buildWsUrl() {
+            const u = endpointUrl(settings.url);
+            u.searchParams.set('conversationId', conversationId);
+            if (settings.apiKey) u.searchParams.set(settings.keyParam || 'x-api-key', settings.apiKey);
+            return u.toString();
+        }
+
+        function setConn(state, text) {
+            $('conn').dataset.state = state;
+            $('connText').textContent = text;
+            $('connHost').textContent = settings.url ? hostOf(settings.url) : '';
+        }
+
+        function refreshControls() {
+            const open = isOpen();
+            $('connectLabel').textContent = open ? 'Disconnect' : 'Connect';
+            $('connectBtn').classList.toggle('primary', !open);
+            $('connectBtn').classList.toggle('is-on', open);
+            $('sendBtn').disabled = !open || !$('msgInput').value.trim();
+            $('sendFileBtn').disabled = !open || !selectedFile;
+            $('sendRecBtn').disabled = !open || !recordedBlob;
+            $('orb').disabled = !open;
+            $('talkHint').innerHTML = open
+                ? 'Hold to talk, or hold <kbd>Space</kbd>. Release to send.'
+                : 'Connect to start talking.';
+            updateEmptyState();
+        }
+
+        function connect() {
+            hideError();
+            if (!settings.url) {
+                showError('Add the WebSocket base URL in Settings first.');
+                openSettings();
+                return;
+            }
+            let url;
+            try { url = buildWsUrl(); } catch (e) {
+                showError('The WebSocket URL in Settings isn\'t valid. It should look like wss://host:port/path.');
+                return;
+            }
+            setConn('connecting', 'Connecting');
+            $('connectBtn').disabled = true;
+            trace('sys', 'Connecting', { detail: maskKey(url) });
+
+            try {
+                ws = new WebSocket(url);
+            } catch (e) {
+                $('connectBtn').disabled = false;
+                setConn('error', 'Invalid URL');
+                showError('Couldn\'t open the connection: ' + e.message);
+                return;
+            }
+            ws.binaryType = 'blob';
+            const thisWs = ws;
+
+            ws.onopen = () => {
+                trace('sys', 'Connected', { detail: 'Subprotocol: ' + (thisWs.protocol || '(none)') + '\nExtensions: ' + (thisWs.extensions || '(none)') });
+                $('connectBtn').disabled = false;
+                setConn('connected', 'Connected');
+                refreshControls();
+                if (activeMode() === 'type') $('msgInput').focus();
+            };
+            ws.onmessage = (ev) => { trace('in', ev.data); handleServerMessage(ev.data); };
+            ws.onerror = () => {
+                trace('sys', 'Error', { bad: true, detail: 'The browser reports WebSocket errors without details. Check the close code that follows, and the server logs.' });
+                setConn('error', 'Connection failed');
+                showError('Connection failed. Check the URL and API key in Settings, and that the server is running.');
+            };
+            ws.onclose = (ev) => {
+                const CLOSE_CODES = {
+                    1000: 'Normal closure', 1001: 'Going away', 1002: 'Protocol error', 1003: 'Unsupported data',
+                    1005: 'No status code', 1006: 'Abnormal closure (no close frame — often a failed handshake, auth rejection or network drop)',
+                    1007: 'Invalid payload data', 1008: 'Policy violation', 1009: 'Message too big', 1011: 'Server error'
+                };
+                trace('sys', 'Closed · code ' + ev.code, {
+                    bad: ev.code !== 1000 && ev.code !== 1005,
+                    detail: (CLOSE_CODES[ev.code] || 'Application-defined code') + '\nReason: ' + (ev.reason || '(none)') + '\nClean: ' + ev.wasClean
+                });
+                if (thisWs !== ws) return; // an older socket closing after a reconnect
+                $('connectBtn').disabled = false;
+                removeTyping();
+                pendingAiTurn = null;
+                releasePttMic();
+                if ($('conn').dataset.state !== 'error') setConn('idle', 'Not connected');
+                if (ev.code > 1000 && ev.code !== 1005) {
+                    showError('Disconnected (code ' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ').');
+                }
+                refreshControls();
+            };
+        }
+
+        function disconnect() {
+            if (ws) ws.close();
+        }
+
+        $('connectBtn').addEventListener('click', () => {
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) disconnect();
+            else connect();
+        });
+
+        // ── New conversation ─────────────────────────────────────────────────
+        $('newConvBtn').addEventListener('click', () => {
+            const wasOpen = ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING);
+            if (ws) { const old = ws; ws = null; old.close(); }
+            conversationId = crypto.randomUUID();
+            stopReplyPlayback();
+            clearTranscript();
+            resetRecording();
+            resetFile();
+            hideError();
+            setConn('idle', 'Not connected');
+            refreshControls();
+            if (wasOpen) connect();
+        });
+
+        // ── Transcript UI ────────────────────────────────────────────────────
+        function updateEmptyState() {
+            const hasMessages = $('transcript').querySelector('.msg');
+            $('emptyState').hidden = !!hasMessages;
+            if (hasMessages) return;
+            if (!settings.url) {
+                $('emptyTitle').textContent = 'Set up the connection';
+                $('emptyText').textContent = 'Add your WebSocket URL and API key to get started.';
+                $('emptySettingsBtn').hidden = false;
+            } else if (!isOpen()) {
+                $('emptyTitle').textContent = 'Start a conversation';
+                $('emptyText').textContent = 'Connect to the server, then hold the talk button and speak.';
+                $('emptySettingsBtn').hidden = true;
+            } else {
+                $('emptyTitle').textContent = 'You\'re connected';
+                $('emptyText').textContent = 'Hold the talk button and speak, or switch to Type to send text.';
+                $('emptySettingsBtn').hidden = true;
+            }
+        }
+        $('emptySettingsBtn').addEventListener('click', () => openSettings());
+
+        function clearTranscript() {
+            $('transcript').querySelectorAll('.msg').forEach(n => n.remove());
+            pendingTranscriptEl = null;
+            typingEl = null;
+            pendingAiTurn = null;
+            lastInputWasAudio = false;
+            updateEmptyState();
+        }
+
+        function createMsg(role) {
+            const msg = document.createElement('div');
+            msg.className = 'msg ' + role;
+            const who = document.createElement('div');
+            who.className = 'who';
+            who.textContent = role === 'user' ? 'You' : 'Assistant';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            msg.append(who, bubble);
+            return { msg, bubble };
+        }
+
+        function appendMsg(msg) {
+            const t = $('transcript');
+            if (typingEl && typingEl.parentNode === t) t.insertBefore(msg, typingEl);
+            else t.appendChild(msg);
+            updateEmptyState();
+            scrollDown();
+        }
+
+        function scrollDown() {
+            const t = $('transcript');
+            t.scrollTop = t.scrollHeight;
+        }
+
+        function showTyping() {
+            if (typingEl) return;
+            const { msg, bubble } = createMsg('ai');
+            bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            typingEl = msg;
+            $('transcript').appendChild(msg);
+            updateEmptyState();
+            scrollDown();
+        }
+
+        function removeTyping() {
+            if (typingEl) { typingEl.remove(); typingEl = null; }
+        }
+
+        function aiTurn() {
+            if (pendingAiTurn) return pendingAiTurn;
+            removeTyping();
+            const { msg, bubble } = createMsg('ai');
+            const text = document.createElement('div');
+            text.className = 'text';
+            const audio = document.createElement('div');
+            bubble.append(text, audio);
+            appendMsg(msg);
+            pendingAiTurn = { text, audio };
+            return pendingAiTurn;
+        }
+
+        function appendUserText(text) {
+            const { msg, bubble } = createMsg('user');
+            bubble.textContent = text;
+            appendMsg(msg);
+        }
+
+        // The user's audio bubble that is still waiting for its transcript (TRANSCRIBED_REQUEST)
+        let pendingTranscriptEl = null;
+
+        async function appendUserAudio(label, blob) {
+            const { msg, bubble } = createMsg('user');
+            const said = document.createElement('div');
+            said.className = 'text said';
+            const clip = await buildClip(blob, label, { meta: label + ' · ' + (blob.size / 1000).toFixed(1) + ' KB' });
+            bubble.append(said, clip);
+            appendMsg(msg);
+            pendingTranscriptEl = said;
+        }
+
+        function showTranscript(text) {
+            if (!pendingTranscriptEl || !text) return; // typed messages already show their text
+            pendingTranscriptEl.textContent = text;
+            pendingTranscriptEl = null;
+            scrollDown();
+        }
+
+        async function buildClip(blob, filename, { meta, autoplay = false } = {}) {
+            const mime = await detectAudioMimeType(blob);
+            const url = URL.createObjectURL(new Blob([blob], { type: mime }));
+
+            const clip = document.createElement('div');
+            clip.className = 'clip';
+            if (meta) {
+                const m = document.createElement('div');
+                m.className = 'clip-meta';
+                m.innerHTML = '<svg class="icon" style="width:14px;height:14px"><use href="#i-mic"/></svg>';
+                m.append(meta);
+                clip.appendChild(m);
+            }
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = url;
+            clip.appendChild(audio);
+            const dl = document.createElement('a');
+            dl.href = url;
+            dl.download = filename || 'audio';
+            dl.textContent = 'Download';
+            clip.appendChild(dl);
+
+            if (autoplay) {
+                stopReplyPlayback();
+                currentReplyAudio = audio;
+                audio.addEventListener('ended', () => { if (currentReplyAudio === audio) currentReplyAudio = null; });
+                audio.play().catch(() => showError('Auto-play was blocked by the browser. Press play on the reply to listen.'));
+            }
+            return clip;
+        }
+
+        function stopReplyPlayback() {
+            if (currentReplyAudio) { currentReplyAudio.pause(); currentReplyAudio = null; }
+        }
+
+        // ── Server → client ──────────────────────────────────────────────────
+        function handleServerMessage(data) {
+            removeTyping();
+            if (data instanceof Blob) {
+                handleAiAudio(data);
+                return;
+            }
+            let message;
+            try { message = JSON.parse(data); } catch (e) { message = null; }
+
+            if (Array.isArray(message)) {
+                // [{ "type": "RESPONSE", ... }, { "type": "TRANSCRIBED_REQUEST", ... }] — any order
+                message.forEach(handleEvent);
+            } else if (message !== null && typeof message === 'object') {
+                if (message.type) handleEvent(message);
+                else appendAiText(JSON.stringify(message, null, 2));
+            } else {
+                appendAiText(String(data)); // plain-text reply
+            }
+        }
+
+        // One typed event: { "type": "...", "message": "..." }
+        function handleEvent(ev) {
+            if (!ev || typeof ev !== 'object') return;
+            switch (ev.type) {
+                case 'RESPONSE':
+                    appendAiText(String(ev.message ?? ''));
+                    break;
+                case 'TRANSCRIBED_REQUEST':
+                    showTranscript(String(ev.message ?? ''));
+                    // transcript alone: the reply is still on its way
+                    if (!pendingAiTurn) showTyping();
+                    break;
+                case 'ERROR':
+                    showError('Server error: ' + ev.message);
+                    setConn('connected', 'Connected');
+                    break;
+                default:
+                    console.warn('Unknown message type:', ev.type, ev);
+            }
+        }
+
+        function appendAiText(text) {
+            const turn = aiTurn();
+            turn.text.textContent = turn.text.textContent ? turn.text.textContent + '\n' + text : text;
+            setConn('connected', 'Connected');
+            scrollDown();
+        }
+
+        async function handleAiAudio(blob) {
+            if (!lastInputWasAudio) {
+                console.log('Ignoring binary reply to a text message');
+                return;
+            }
+            const turn = aiTurn();
+            turn.audio.appendChild(await buildClip(blob, 'reply.audio', { autoplay: true }));
+            setConn('connected', 'Connected');
+            scrollDown();
+        }
+
+        // ── Sending ──────────────────────────────────────────────────────────
+        function beginTurn(isAudio) {
+            lastInputWasAudio = isAudio;
+            pendingAiTurn = null;
+            hideError();
+            showTyping();
+            setConn('waiting', 'Waiting for reply');
+        }
+
+        function sendText() {
+            const input = $('msgInput');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!isOpen()) { showError('Not connected.'); return; }
+            appendUserText(text);
+            input.value = '';
+            autoGrow();
+            beginTurn(false);
+            const payload = JSON.stringify({ type: 'CHAT', message: text });
+            trace('out', payload);
+            ws.send(payload);
+            refreshControls();
+        }
+
+        async function sendAudio(blob, label) {
+            if (!isOpen()) { showError('Not connected.'); return false; }
+            if (blob.size > MAX_UPLOAD_SIZE) {
+                showError('Audio too large (' + (blob.size / 1e6).toFixed(1) + ' MB). The limit is ' + (MAX_UPLOAD_SIZE / 1e6) + ' MB.');
+                return false;
+            }
+            await appendUserAudio(label, blob);
+            beginTurn(true);
+            trace('out', blob);
+            ws.send(new Uint8Array(await blob.arrayBuffer()));
+            return true;
+        }
+
+        // ── Modes ────────────────────────────────────────────────────────────
+        function activeMode() {
+            return document.querySelector('.mode[aria-selected="true"]').dataset.mode;
+        }
+
+        document.querySelectorAll('.mode').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.mode').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+                document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab.dataset.mode));
+                if (tab.dataset.mode !== 'talk') releasePttMic();
+                if (tab.dataset.mode === 'type' && isOpen()) $('msgInput').focus();
+            });
+        });
+
+        // ── Type ─────────────────────────────────────────────────────────────
+        function autoGrow() {
+            const el = $('msgInput');
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+        }
+        $('msgInput').addEventListener('input', () => { autoGrow(); refreshControls(); });
+        $('msgInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+        });
+        $('sendBtn').addEventListener('click', sendText);
+
+        // ── Audio file ───────────────────────────────────────────────────────
+        let selectedFile = null;
+
+        function selectFile(file) {
+            selectedFile = file || null;
+            if (selectedFile) {
+                $('dropText').innerHTML = '';
+                const strong = document.createElement('strong');
+                strong.textContent = selectedFile.name;
+                $('dropText').append(strong, (selectedFile.size / 1e6).toFixed(2) + ' MB · ' + (selectedFile.type || 'unknown type'));
+                $('clearFileBtn').hidden = false;
+            } else {
+                $('dropText').innerHTML = '<strong>Choose an audio file</strong>or drop one here — WAV, MP3, M4A, OGG, FLAC, WebM';
+                $('clearFileBtn').hidden = true;
+            }
+            hideError();
+            refreshControls();
+        }
+
+        function resetFile() {
+            $('fileInput').value = '';
+            selectFile(null);
+        }
+
+        $('fileInput').addEventListener('change', (e) => selectFile(e.target.files[0]));
+        $('clearFileBtn').addEventListener('click', resetFile);
+
+        const drop = $('drop');
+        ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+        ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('over')));
+        drop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const f = e.dataTransfer.files[0];
+            if (f) selectFile(f);
+        });
+
+        $('sendFileBtn').addEventListener('click', async () => {
+            if (!selectedFile) return;
+            try {
+                const blob = new Blob([await selectedFile.arrayBuffer()], { type: selectedFile.type });
+                if (await sendAudio(blob, selectedFile.name)) resetFile();
+            } catch (e) {
+                showError('Couldn\'t read the audio file: ' + e.message);
+            }
+        });
+
+        // ── Microphone helpers ───────────────────────────────────────────────
+        function micProblem() {
+            if (!window.isSecureContext) {
+                return 'The microphone only works on a secure page. Open this file directly, or via https:// or http://localhost.';
+            }
+            if (!navigator.mediaDevices?.getUserMedia) return 'This browser doesn\'t allow microphone access here.';
+            if (typeof MediaRecorder === 'undefined') return 'This browser doesn\'t support audio recording.';
+            return null;
+        }
+
+        function micErrorText(e) {
+            if (e.name === 'NotAllowedError') {
+                return 'Microphone access is blocked. Allow it from the icon at the left of Chrome\'s address bar, and turn on Google Chrome in macOS System Settings → Privacy & Security → Microphone.';
+            }
+            if (e.name === 'NotFoundError') return 'No microphone found. Check System Settings → Sound → Input.';
+            return 'Microphone unavailable: ' + e.name + ' — ' + e.message;
+        }
+
+        async function openMic(deviceId = settings.micId) {
+            const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+            if (deviceId) audio.deviceId = { exact: deviceId };
+            try {
+                return await navigator.mediaDevices.getUserMedia({ audio });
+            } catch (e) {
+                if (deviceId && (e.name === 'OverconstrainedError' || e.name === 'NotFoundError')) {
+                    return await navigator.mediaDevices.getUserMedia({ audio: true }); // saved device unplugged
+                }
+                throw e;
+            }
+        }
+
+        async function populateMics(selectedId) {
+            if (!navigator.mediaDevices?.enumerateDevices) return;
+            const sel = $('setMic');
+            const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+            sel.innerHTML = '<option value="">System default</option>';
+            devices.forEach((d, i) => {
+                if (d.deviceId === 'default' || d.deviceId === 'communications') return;
+                const o = document.createElement('option');
+                o.value = d.deviceId;
+                o.textContent = d.label || 'Microphone ' + (i + 1);
+                sel.appendChild(o);
+            });
+            const want = selectedId ?? settings.micId;
+            sel.value = [...sel.options].some(o => o.value === want) ? want : '';
+        }
+        navigator.mediaDevices?.addEventListener?.('devicechange', () => populateMics($('setMic').value));
+
+        // One level meter at a time; calls onLevel(0..1) every frame and tracks the peak
+        let meter = null;
+        function startMeter(stream, onLevel) {
+            stopMeter();
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 512;
+            ctx.createMediaStreamSource(stream).connect(analyser);
+            const data = new Float32Array(analyser.fftSize);
+            meter = { ctx, raf: 0, peak: 0, onLevel };
+            const tick = () => {
+                analyser.getFloatTimeDomainData(data);
+                let p = 0;
+                for (const v of data) p = Math.max(p, Math.abs(v));
+                meter.peak = Math.max(meter.peak, p);
+                onLevel(Math.min(1, p * 1.6));
+                meter.raf = requestAnimationFrame(tick);
+            };
+            tick();
+        }
+        function stopMeter() {
+            if (!meter) return 0;
+            cancelAnimationFrame(meter.raf);
+            meter.ctx.close();
+            meter.onLevel(0);
+            const peak = meter.peak;
+            meter = null;
+            return peak;
+        }
+
+        // ── Push to talk ─────────────────────────────────────────────────────
+        // The mic stays open while the Talk tab is active, so each press starts
+        // recording instantly and the first word isn't clipped.
+        let pttStream = null, pttRecorder = null, pttChunks = [];
+        let pttPressed = false, pttBusy = false, pttStart = 0;
+        const orb = $('orb');
+
+        function setOrb(state) {
+            orb.classList.toggle('listening', state === 'listening');
+            orb.classList.toggle('busy', state === 'busy');
+            const hint = { listening: 'Listening — release to send', busy: 'Sending…' }[state];
+            if (hint) $('talkHint').textContent = hint;
+            else refreshControls();
+        }
+        const setOrbLevel = (l) => orb.style.setProperty('--level', l.toFixed(3));
+
+        function releasePttMic() {
+            if (pttRecorder && pttRecorder.state === 'recording') {
+                pttRecorder.onstop = null;
+                pttRecorder.stop();
+            }
+            pttRecorder = null;
+            pttPressed = false;
+            if (pttStream) { pttStream.getTracks().forEach(t => t.stop()); pttStream = null; }
+            if (meter?.onLevel === setOrbLevel) stopMeter();
+            if (!pttBusy) setOrb('idle');
+        }
+
+        async function pttPress() {
+            if (pttPressed || pttBusy) return;
+            if (!isOpen()) { showError('Connect first, then hold to talk.'); return; }
+            const p = micProblem();
+            if (p) { showError(p); return; }
+
+            pttPressed = true;
+            stopReplyPlayback(); // barge-in
+            hideError();
+            setOrb('listening');
+
+            if (!pttStream) {
+                try {
+                    stopMicTest();
+                    pttStream = await openMic();
+                } catch (e) {
+                    pttPressed = false;
+                    setOrb('idle');
+                    showError(micErrorText(e));
+                    return;
+                }
+                if (!pttPressed) { setOrb('idle'); return; } // released while the mic was opening
+            }
+
+            pttChunks = [];
+            pttRecorder = new MediaRecorder(pttStream);
+            pttRecorder.ondataavailable = (e) => { if (e.data && e.data.size) pttChunks.push(e.data); };
+            pttRecorder.onstop = onPttStop;
+            pttRecorder.start(100);
+            pttStart = performance.now();
+            startMeter(pttStream, setOrbLevel);
+        }
+
+        function pttRelease() {
+            if (!pttPressed) return;
+            pttPressed = false;
+            if (pttRecorder && pttRecorder.state === 'recording') pttRecorder.stop();
+            else setOrb('idle');
+        }
+
+        async function onPttStop() {
+            const peak = stopMeter();
+            const ms = performance.now() - pttStart;
+            const raw = new Blob(pttChunks, { type: pttRecorder?.mimeType || 'audio/webm' });
+            pttChunks = [];
+
+            if (ms < PTT_MIN_MS || !raw.size) { setOrb('idle'); showError('Too short. Hold the button while you speak.'); return; }
+            if (peak < 0.01) { setOrb('idle'); showError('No sound detected. Check the microphone in Settings.'); return; }
+
+            pttBusy = true;
+            setOrb('busy');
+            try {
+                let wav;
+                try { wav = await convertToWav(raw, 16000); } catch (e) { console.error(e); wav = raw; }
+                await sendAudio(wav, 'push-to-talk.wav');
+            } finally {
+                pttBusy = false;
+                setOrb('idle');
+            }
+        }
+
+        orb.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0 || orb.disabled) return;
+            e.preventDefault();
+            orb.setPointerCapture(e.pointerId);
+            pttPress();
+        });
+        orb.addEventListener('pointerup', pttRelease);
+        orb.addEventListener('pointercancel', pttRelease);
+        orb.addEventListener('lostpointercapture', pttRelease);
+        orb.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        const isTyping = (el) => el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable);
+        document.addEventListener('keydown', (e) => {
+            if (e.code !== 'Space' || activeMode() !== 'talk' || activeView() === 'help' || isTyping(e.target) || $('settings').open) return;
+            e.preventDefault();
+            if (!e.repeat) pttPress();
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.code !== 'Space' || activeMode() !== 'talk' || activeView() === 'help' || isTyping(e.target) || $('settings').open) return;
+            e.preventDefault();
+            pttRelease();
+        });
+        window.addEventListener('blur', pttRelease);
+
+        // ── Record (record, review, then send) ───────────────────────────────
+        let recStream = null, recRecorder = null, recChunks = [], recordedBlob = null;
+        let recDiscarding = false, recTimer = 0, recStart = 0;
+
+        function setRecUi(on) {
+            $('recBtn').classList.toggle('is-on', on);
+            $('recLabel').textContent = on ? 'Stop' : 'Start recording';
+            $('recIcon').setAttribute('href', on ? '#i-stop' : '#i-record');
+            clearInterval(recTimer);
+            if (on) {
+                recStart = Date.now();
+                const tick = () => {
+                    const s = Math.floor((Date.now() - recStart) / 1000);
+                    $('recTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+                };
+                tick();
+                recTimer = setInterval(tick, 500);
+            } else {
+                $('recTime').textContent = '';
+            }
+        }
+
+        $('recBtn').addEventListener('click', async () => {
+            if (recRecorder && recRecorder.state === 'recording') { recRecorder.stop(); return; }
+            const p = micProblem();
+            if (p) { showError(p); return; }
+            try {
+                stopMicTest();
+                recStream = await openMic();
+            } catch (e) { showError(micErrorText(e)); return; }
+
+            resetRecordingPreview();
+            recDiscarding = false;
+            recChunks = [];
+            recRecorder = new MediaRecorder(recStream);
+            recRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+            recRecorder.onstop = async () => {
+                setRecUi(false);
+                if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+                if (recDiscarding) return;
+                const raw = new Blob(recChunks, { type: recRecorder.mimeType || 'audio/webm' });
+                if (!raw.size) { showError('The recording is empty. Check the microphone in Settings.'); return; }
+                try { recordedBlob = await convertToWav(raw, 16000); } catch (e) { console.error(e); recordedBlob = raw; }
+                const player = $('recPlayer');
+                if (player.src) URL.revokeObjectURL(player.src);
+                player.src = URL.createObjectURL(recordedBlob);
+                $('recPreview').classList.add('show');
+                refreshControls();
+            };
+            recRecorder.start(250);
+            setRecUi(true);
+            hideError();
+        });
+
+        function resetRecordingPreview() {
+            recordedBlob = null;
+            const player = $('recPlayer');
+            if (player.src) URL.revokeObjectURL(player.src);
+            player.removeAttribute('src');
+            $('recPreview').classList.remove('show');
+            refreshControls();
+        }
+
+        function resetRecording() {
+            if (recRecorder && recRecorder.state === 'recording') { recDiscarding = true; recRecorder.stop(); }
+            if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+            setRecUi(false);
+            resetRecordingPreview();
+        }
+
+        $('discardBtn').addEventListener('click', resetRecording);
+        $('sendRecBtn').addEventListener('click', async () => {
+            if (!recordedBlob) return;
+            if (await sendAudio(recordedBlob, 'recording.wav')) resetRecording();
+        });
+
+        // ── Settings dialog ──────────────────────────────────────────────────
+        const dlg = $('settings');
+        let testStream = null;
+
+        function openSettings() {
+            $('setUrl').value = settings.url;
+            updateUrlPreview();
+            $('setKey').value = settings.apiKey;
+            $('setKey').type = 'password';
+            $('setKeyParam').value = settings.keyParam;
+            document.querySelectorAll('input[name="theme"]').forEach(r => { r.checked = r.value === settings.theme; });
+            $('micStatus').textContent = '';
+            populateMics(settings.micId);
+            dlg.showModal();
+            if (!settings.url) $('setUrl').focus();
+        }
+
+        $('settingsBtn').addEventListener('click', openSettings);
+        document.querySelectorAll('[data-open-settings]').forEach(b => b.addEventListener('click', () => openSettings()));
+
+        // Show the full endpoint the app will connect to, as the base URL is typed
+        function updateUrlPreview() {
+            const v = $('setUrl').value.trim();
+            let text = '';
+            if (v) {
+                try { text = 'Connects to ' + endpointUrl(v).toString(); }
+                catch (e) { text = 'Enter a full address starting with wss:// (or ws://).'; }
+            }
+            $('urlPreview').textContent = text;
+        }
+        $('setUrl').addEventListener('input', updateUrlPreview);
+
+        $('toggleKey').addEventListener('click', () => {
+            const k = $('setKey');
+            k.type = k.type === 'password' ? 'text' : 'password';
+            $('toggleKey').setAttribute('aria-label', k.type === 'password' ? 'Show API key' : 'Hide API key');
+        });
+
+        // Live preview of the theme while choosing
+        document.querySelectorAll('input[name="theme"]').forEach(r => r.addEventListener('change', () => {
+            const prev = settings.theme;
+            settings.theme = r.value;
+            applyTheme();
+            settings.theme = prev;
+        }));
+
+        function stopMicTest() {
+            if (testStream) { testStream.getTracks().forEach(t => t.stop()); testStream = null; }
+            if (meter && meter.onLevel === setTestLevel) stopMeter();
+            $('micTestBtn').textContent = 'Test';
+        }
+        const setTestLevel = (l) => { $('testMeter').style.width = (l * 100).toFixed(1) + '%'; };
+
+        $('micTestBtn').addEventListener('click', async () => {
+            if (testStream) {
+                const peak = meter ? meter.peak : 0;
+                stopMicTest();
+                $('micStatus').textContent = peak > 0.01 ? 'Microphone is working.' : 'No sound detected. Try another device or raise the input volume.';
+                return;
+            }
+            const p = micProblem();
+            if (p) { $('micStatus').textContent = p; return; }
+            releasePttMic();
+            try { testStream = await openMic($('setMic').value); } catch (e) { $('micStatus').textContent = micErrorText(e); return; }
+            await populateMics($('setMic').value);
+            startMeter(testStream, setTestLevel);
+            $('micTestBtn').textContent = 'Stop';
+            $('micStatus').textContent = 'Listening on ' + (testStream.getAudioTracks()[0]?.label || 'microphone') + '. Speak to see the level.';
+        });
+
+        $('setMic').addEventListener('change', () => { if (testStream) { stopMicTest(); $('micStatus').textContent = 'Device changed. Press Test again.'; } });
+
+        dlg.addEventListener('close', () => {
+            stopMicTest();
+            if (dlg.returnValue !== 'save') { applyTheme(); return; }
+
+            const before = { url: settings.url, apiKey: settings.apiKey, keyParam: settings.keyParam, micId: settings.micId };
+            settings.url = $('setUrl').value.trim();
+            settings.apiKey = $('setKey').value.trim();
+            settings.keyParam = $('setKeyParam').value.trim() || 'x-api-key';
+            settings.micId = $('setMic').value;
+            settings.theme = document.querySelector('input[name="theme"]:checked')?.value || 'system';
+            persistSettings();
+            applyTheme();
+
+            if (settings.micId !== before.micId) releasePttMic();
+
+            const connChanged = settings.url !== before.url || settings.apiKey !== before.apiKey || settings.keyParam !== before.keyParam;
+            if (connChanged && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                const old = ws; ws = null; old.close();
+                connect();
+            } else {
+                setConn($('conn').dataset.state, $('connText').textContent);
+                refreshControls();
+            }
+        });
+
+        // ── Audio utilities ──────────────────────────────────────────────────
+        async function convertToWav(blob, rate) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            let decoded;
+            try { decoded = await ctx.decodeAudioData(await blob.arrayBuffer()); } finally { ctx.close(); }
+            const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+            const src = off.createBufferSource();
+            src.buffer = decoded;
+            src.connect(off.destination);
+            src.start();
+            return encodeWav((await off.startRendering()).getChannelData(0), rate);
+        }
+
+        function encodeWav(samples, rate) {
+            const buf = new ArrayBuffer(44 + samples.length * 2);
+            const v = new DataView(buf);
+            const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+            str(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+            str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+            v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+            str(36, 'data'); v.setUint32(40, samples.length * 2, true);
+            for (let i = 0, o = 44; i < samples.length; i++, o += 2) {
+                const s = Math.max(-1, Math.min(1, samples[i]));
+                v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return new Blob([buf], { type: 'audio/wav' });
+        }
+
+        async function detectAudioMimeType(blob) {
+            const b = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+            if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return 'audio/mpeg';
+            if (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0) return 'audio/mpeg';
+            if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) return 'audio/wav';
+            if (b[0] === 0x4F && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53) return 'audio/ogg';
+            if (b[0] === 0x66 && b[1] === 0x4C && b[2] === 0x61 && b[3] === 0x43) return 'audio/flac';
+            if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) return 'audio/webm';
+            if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return 'audio/mp4';
+            return blob.type || 'audio/webm';
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────
+        applyTheme();
+        setConn('idle', 'Not connected');
+        refreshControls();
+        if (!settings.url) openSettings();
+
+        window.addEventListener('beforeunload', () => {
+            if (ws) ws.close();
+            releasePttMic();
+            resetRecording();
+            stopMicTest();
+        });
+    })();
+    </script>
+</body>
+</html>
